@@ -1,0 +1,203 @@
+# Game Discovery API — sample requests.
+# Open in VS Code with the "REST Client" extension (or any JetBrains IDE)
+# and click "Send Request" above a request. Start the API first: go run ./cmd/api
+
+@base = http://localhost:8080/api
+
+### Health (shows whether PostgreSQL is connected)
+GET {{base}}/health
+
+### All games (page 1, 20 per page, trending first)
+GET {{base}}/games
+
+### Pagination
+GET {{base}}/games?page=2&limit=5
+
+### One game by slug (a UUID works too)
+GET {{base}}/games/neon-drift
+
+### Featured
+GET {{base}}/games/featured
+
+### Trending
+GET {{base}}/games/trending?limit=10
+
+### Popular
+GET {{base}}/games/popular?limit=10
+
+### Search (q is required)
+GET {{base}}/games/search?q=drift
+
+### Search only developer names
+GET {{base}}/games/search?q=paleface&field=developer
+
+### Search with a JSON body
+POST {{base}}/games/search
+Content-Type: application/json
+
+{"text": "racing", "field": "category", "platforms": ["pc"], "prices": ["discounted"], "sort": "price_low"}
+
+### Price: free
+GET {{base}}/games?price=free
+
+### Price: paid (includes discounted)
+GET {{base}}/games?price=paid
+
+### Price: discounted
+GET {{base}}/games?price=discounted
+
+### Combined filters: racing OR shooting, discounted on PC, cheapest first
+GET {{base}}/games?category=racing,shooting&platform=pc&price=discounted&sort=price_low
+
+### Combined: text + category + platform + rating
+GET {{base}}/games?q=neon&category=racing&platform=pc&min_rating=4&sort=rating
+
+### Categories
+GET {{base}}/categories
+
+### Games in a category (slug or numeric id)
+GET {{base}}/categories/racing/games
+
+### Platforms
+GET {{base}}/platforms
+
+### Games on a platform, free only
+GET {{base}}/platforms/android/games?price=free
+
+### Error: invalid parameters (422)
+GET {{base}}/games?price=cheap&sort=best&limit=500
+
+### Error: unknown category (422)
+GET {{base}}/games?category=not-real
+
+### Error: not found (404)
+GET {{base}}/games/no-such-game
+
+# ======================================================================
+# Store links ("Get the game" buttons)
+#
+# Public (no sign-in) — work in sample-data mode too (empty until links exist):
+#   GET /games/{id}/store-links, /available-platforms, /download-options
+# Admin — needs PostgreSQL and an admin account:
+#   1. Register in the app, then: go run ./cmd/dbtool make-admin you@example.com
+#   2. Set @adminEmail / @adminPassword below and send "Admin login" first.
+#
+# Every link must be the official listing on that store's own domain.
+# The placeholders below are guaranteed fake (reserved "example" names) so
+# they never point at someone else's real game. For a real game use its real
+# listing or id — never a guessed one.
+# ======================================================================
+
+@adminEmail = you@example.com
+@adminPassword = change-me
+
+### Public: the game's official store links
+GET {{base}}/v1/games/velocity-rush/store-links
+
+### Public: platforms the game is on, with availability
+GET {{base}}/v1/games/velocity-rush/available-platforms
+
+### Public: buttons for one device (platform=android|ios|windows|macos|linux|ps5, or os=…)
+GET {{base}}/v1/games/velocity-rush/download-options?os=android
+
+### Public: not available on this platform (message + other platforms)
+GET {{base}}/v1/games/velocity-rush/download-options?platform=ps5
+
+### Public: platforms with their operating system
+GET {{base}}/v1/platforms
+
+### Admin login
+# @name adminLogin
+POST {{base}}/v1/auth/login
+Content-Type: application/json
+
+{"login": "{{adminEmail}}", "password": "{{adminPassword}}"}
+
+### The game to edit (its id is used below)
+# @name storeGame
+GET {{base}}/v1/games/velocity-rush
+
+### Admin: every link (all statuses) + trusted domains
+GET {{base}}/v1/admin/games/{{storeGame.response.body.data.id}}/store-links
+Authorization: Bearer {{adminLogin.response.body.data.token}}
+
+### Admin: add a Google Play link from the Android package id
+# The official listing address is built from the id you enter.
+# @name addedLink
+POST {{base}}/v1/admin/games/{{storeGame.response.body.data.id}}/store-links
+Authorization: Bearer {{adminLogin.response.body.data.token}}
+Content-Type: application/json
+
+{"platform": "android", "store": "google_play", "package_id": "com.example.velocityrush"}
+
+### Admin: add a link by URL (ids are read from it). Steam: "product_id": "<app id>"
+POST {{base}}/v1/admin/games/{{storeGame.response.body.data.id}}/store-links
+Authorization: Bearer {{adminLogin.response.body.data.token}}
+Content-Type: application/json
+
+{"platform": "windows", "store": "epic", "url": "https://store.epicgames.com/en-US/p/example-velocity-rush"}
+
+### Admin: edit a link (status, URL or ids). mark_verified stamps last_verified_at.
+PATCH {{base}}/v1/admin/games/{{storeGame.response.body.data.id}}/store-links/{{addedLink.response.body.data.id}}
+Authorization: Bearer {{adminLogin.response.body.data.token}}
+Content-Type: application/json
+
+{"status": "coming_soon", "mark_verified": true}
+
+### Admin: availability of every link on one platform
+PATCH {{base}}/v1/admin/games/{{storeGame.response.body.data.id}}/platforms/android
+Authorization: Bearer {{adminLogin.response.body.data.token}}
+Content-Type: application/json
+
+{"status": "available"}
+
+### Admin: publisher website = the trusted domain for "official_website" links
+PATCH {{base}}/v1/admin/games/{{storeGame.response.body.data.id}}/studios
+Authorization: Bearer {{adminLogin.response.body.data.token}}
+Content-Type: application/json
+
+{"publisher_website": "https://www.velocity.example.com"}
+
+### Admin: official website link (must be on that domain)
+POST {{base}}/v1/admin/games/{{storeGame.response.body.data.id}}/store-links
+Authorization: Bearer {{adminLogin.response.body.data.token}}
+Content-Type: application/json
+
+{"platform": "windows", "store": "official_website", "url": "https://www.velocity.example.com/download/pc"}
+
+### Refused (422): an installer file, not a download page
+POST {{base}}/v1/admin/games/{{storeGame.response.body.data.id}}/store-links
+Authorization: Bearer {{adminLogin.response.body.data.token}}
+Content-Type: application/json
+
+{"platform": "windows", "store": "official_website", "url": "https://www.velocity.example.com/VelocitySetup.exe"}
+
+### Refused (422): an open redirect
+POST {{base}}/v1/admin/games/{{storeGame.response.body.data.id}}/store-links
+Authorization: Bearer {{adminLogin.response.body.data.token}}
+Content-Type: application/json
+
+{"platform": "windows", "store": "official_website", "url": "https://www.velocity.example.com/out?url=https://evil.example"}
+
+### Refused (409): the same store twice on one platform
+POST {{base}}/v1/admin/games/{{storeGame.response.body.data.id}}/store-links
+Authorization: Bearer {{adminLogin.response.body.data.token}}
+Content-Type: application/json
+
+{"platform": "android", "store": "google_play", "package_id": "com.example.other"}
+
+### Admin: delete a link
+DELETE {{base}}/v1/admin/games/{{storeGame.response.body.data.id}}/store-links/{{addedLink.response.body.data.id}}
+Authorization: Bearer {{adminLogin.response.body.data.token}}
+
+### Admin: replace every link + the Play Now link at once (empty list clears)
+PUT {{base}}/v1/admin/games/{{storeGame.response.body.data.id}}/store-links
+Authorization: Bearer {{adminLogin.response.body.data.token}}
+Content-Type: application/json
+
+{
+  "links": [
+    {"platform": "android", "store": "google_play", "package_id": "com.example.velocityrush"}
+  ],
+  "launch_uri": "velocityrush://play"
+}

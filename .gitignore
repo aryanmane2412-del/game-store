@@ -1,0 +1,12 @@
+# Secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# Build output
+/bin/
+*.exe
+
+# Uploaded files (keep the folder)
+uploads/*
+!uploads/.gitkeep

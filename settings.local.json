@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\" -ErrorAction SilentlyContinue; if \\(-not $?\\) { Get-ChildItem \"C:\\\\Users\\\\DELL\\\\AppData\\\\Local\\\\Programs\\\\DockerDesktop\" -Filter \"Docker Desktop.exe\" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object { Start-Process $_.FullName } }; \"started\")"
+    ]
+  }
+}
